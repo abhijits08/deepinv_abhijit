@@ -296,7 +296,7 @@ class BaseOptim(nn.Module):
         )
         return cur_data_fidelity
 
-    def init_iterate_fn(self, y, physics, F_fn=None):
+    def init_iterate_fn(self, y, physics, W=None, F_fn=None):
         r"""
         Initializes the iterate of the algorithm.
         The first iterate is stored in a dictionary of the form ``X = {'est': (x_0, u_0), 'cost': F_0}`` where:
@@ -309,6 +309,7 @@ class BaseOptim(nn.Module):
 
         :param torch.Tensor y: measurement vector.
         :param deepinv.physics: physics of the problem.
+        :param torch.Tensor W: Weight matrix associated with "y".
         :param F_fn: function that computes the cost function.
         :return: a dictionary containing the first iterate of the algorithm.
         """
@@ -328,6 +329,7 @@ class BaseOptim(nn.Module):
                 self.update_params_fn(0),
                 y,
                 physics,
+                W,
             )
             if self.has_cost and F_fn is not None
             else None
@@ -465,19 +467,27 @@ class BaseOptim(nn.Module):
         else:
             return False
 
-    def forward(self, y, physics, x_gt=None, compute_metrics=False):
+    def forward(self, y, physics, W=None, x_gt=None, compute_metrics=False):
         r"""
         Runs the fixed-point iteration algorithm for solving :ref:`(1) <optim>`.
 
         :param torch.Tensor y: measurement vector.
         :param deepinv.physics physics: physics of the problem for the acquisition of ``y``.
+        :param torch.Tensor W: Weight matrix associated with "y".
         :param torch.Tensor x_gt: (optional) ground truth image, for plotting the PSNR across optim iterations.
         :param bool compute_metrics: whether to compute the metrics or not. Default: ``False``.
         :return: If ``compute_metrics`` is ``False``,  returns (torch.Tensor) the output of the algorithm.
                 Else, returns (torch.Tensor, dict) the output of the algorithm and the metrics.
         """
+        # Added by Abhijit
+        # The next three lines are required to compute a new step size for each input.
+        # The variables alpha_1 and alpha_2 are hard-coded. Need to change these names if the user-defined data fidelity function uses different variables.
+        W_transformed = (self.data_fidelity[0].alpha_1 * W) + self.data_fidelity[0].alpha_2
+        # W_transformed = self.data_fidelity[0].transform_W(W)
+        L = torch.max(torch.square(W_transformed))
+        print("This is L in BaseOptim.forward(): ", L)
         X, metrics = self.fixed_point(
-            y, physics, x_gt=x_gt, compute_metrics=compute_metrics
+            y, physics, W, L=L, x_gt=x_gt, compute_metrics=compute_metrics
         )
         x = self.get_output(X)
         if compute_metrics:
@@ -510,7 +520,7 @@ def create_iterator(iteration, prior=None, F_fn=None, g_first=False):
     )
     if F_fn is None and explicit_prior:
 
-        def F_fn(x, data_fidelity, prior, cur_params, y, physics):
+        def F_fn(x, data_fidelity, prior, cur_params, y, physics, W=None):
             prior_value = prior(x, cur_params["g_param"], reduce=False)
             if prior_value.dim() == 0:
                 reg_value = cur_params["lambda"] * prior_value
@@ -521,7 +531,7 @@ def create_iterator(iteration, prior=None, F_fn=None, g_first=False):
                     reg_value = (
                         cur_params["lambda"].flatten() * prior_value.flatten()
                     ).sum()
-            return data_fidelity(x, y, physics) + reg_value
+            return data_fidelity(x, y, physics, W) + reg_value
 
         has_cost = True  # boolean to indicate if there is a cost function to evaluate along the iterations
     else:
