@@ -7,6 +7,9 @@ import torch
 from pathlib import Path
 from deepinv.loss import PSNR
 import warnings
+# Added by Abhijit
+from deepinv.optim.utils import get_W
+from prettytable import PrettyTable
 
 
 def test(
@@ -75,6 +78,10 @@ def test(
         test_dataloader = [test_dataloader]
 
     G = len(test_dataloader)
+    # Temp code
+    #print("G is: ", G)
+    initial_psnr = []
+    final_psnr = []    
 
     show_operators = 5
 
@@ -136,12 +143,14 @@ def test(
 
                     y = y.to(device)
 
+            # Added by Abhijit
+            W = get_W(y)
             if plot_metrics:
                 x_net, optim_metrics = model(
-                    y, physics_cur, x_gt=x, compute_metrics=True
+                    y, physics_cur, W, x_gt=x, compute_metrics=True
                 )
             else:
-                x_net = model(y, physics_cur)
+                x_net = model(y, physics_cur, W)
 
             if hasattr(physics_cur, "A_adjoint"):
                 if isinstance(physics_cur, torch.nn.DataParallel):
@@ -160,8 +169,13 @@ def test(
             for k, l in enumerate(metrics):
                 loss = l(x=x, x_net=x_net, y=y, physics=physics)
                 logs_metrics[k].update(loss.detach().cpu().numpy())
+                # Temp code
+                final_psnr.append(loss.detach().cpu().numpy())
+                
                 loss = l(x=x, x_net=x_init, y=y, physics=physics)
                 logs_metrics_init[k].update(loss.detach().cpu().numpy())
+                # Temp code
+                initial_psnr.append(loss.detach().cpu().numpy())
 
             if plot_images:
                 save_folder_im = (
@@ -206,6 +220,14 @@ def test(
                 f"Test {l.__class__.__name__}: No learning rec.: {logs_metrics_init[k].avg:.3f}+-{logs_metrics_init[k].std:.3f} "
                 f"| Model: {logs_metrics[k].avg:.3f}+-{logs_metrics[k].std:.3f}. "
             )
+            # Temp code
+            #print("Type of logs_metrics? ", type(logs_metrics))
+            #print("Length of logs_metrics? ", len(logs_metrics))
+            #print("What is logs_metrics[0]? ", logs_metrics[0])
+            t = PrettyTable(['Figure number', 'Initial PSNR', 'Final PSNR', 'Change'])
+            for i in range(len(initial_psnr)):
+                t.add_row([i+1, initial_psnr[i], final_psnr[i], final_psnr[i] - initial_psnr[i]])
+            print(t)            
 
     return (
         logs_metrics[0].avg,
