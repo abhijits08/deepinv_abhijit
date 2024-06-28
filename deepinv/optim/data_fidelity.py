@@ -104,18 +104,20 @@ class DataFidelity(nn.Module):
             grad, u, step_size=stepsize_inter, max_iter=max_iter_inter, tol=tol_inter
         )
 
-    def forward(self, x, y, physics, *args, **kwargs):
+    def forward(self, x, y, physics, W=None, *args, **kwargs):
         r"""
         Computes the data fidelity term :math:`\datafid{x}{y} = \distance{\forw{x}}{y}`.
 
         :param torch.Tensor x: Variable :math:`x` at which the data fidelity is computed.
         :param torch.Tensor y: Data :math:`y`.
         :param deepinv.physics.Physics physics: physics model.
+        :param torch.Tensor W: Weight matrix associated with "y".
         :return: (torch.Tensor) data fidelity :math:`\datafid{x}{y}`.
         """
-        return self.d(physics.A(x), y, *args, **kwargs)
+        # Modified by Abhijit
+        return self.d(physics.A(x), y, W, *args, **kwargs)
 
-    def grad(self, x, y, physics, *args, **kwargs):
+    def grad(self, x, y, physics, W=None, *args, **kwargs):
         r"""
         Calculates the gradient of the data fidelity term :math:`\datafidname` at :math:`x`.
 
@@ -130,9 +132,11 @@ class DataFidelity(nn.Module):
         :param torch.Tensor x: Variable :math:`x` at which the gradient is computed.
         :param torch.Tensor y: Data :math:`y`.
         :param deepinv.physics.Physics physics: physics model.
+        :param torch.Tensor W: Weight matrix associated with "y".
         :return: (torch.Tensor) gradient :math:`\nabla_x \datafid{x}{y}`, computed in :math:`x`.
         """
-        return physics.A_vjp(x, self.grad_d(physics.A(x), y, *args, **kwargs))
+        # Modified by Abhijit
+        return physics.A_vjp(x, self.grad_d(physics.A(x), y, W, *args, **kwargs))
 
     def prox(
         self,
