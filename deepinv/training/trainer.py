@@ -14,6 +14,8 @@ from deepinv.physics import Physics
 from deepinv.physics.generator import PhysicsGenerator
 from .testing import test
 import inspect
+# Added by Abhijit
+from deepinv.optim.utils import get_W
 
 
 @dataclass
@@ -445,11 +447,14 @@ class Trainer:
         """
         y = y.to(self.device)
 
+        # Added by Abhijit
+        W = get_W(y)        
+
         # check if the forward has 'update_parameters' method, and if so, update the parameters
         if "update_parameters" in inspect.signature(self.model.forward).parameters:
-            x_net = self.model(y, physics, update_parameters=True)
+            x_net = self.model(y, physics, W, update_parameters=True)
         else:
-            x_net = self.model(y, physics)
+            x_net = self.model(y, physics, W)
         return x_net
 
     def compute_loss(self, physics, x, y, train=True):
