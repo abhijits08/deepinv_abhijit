@@ -14,6 +14,8 @@ from deepinv.physics.generator import PhysicsGenerator
 from deepinv.utils.plotting import prepare_images
 from torchvision.utils import save_image
 import inspect
+# Added by Abhijit
+from deepinv.optim.utils import get_W
 
 
 @dataclass
@@ -458,6 +460,9 @@ class Trainer:
         :returns: The network reconstruction.
         """
         y = y.to(self.device)
+        
+        # Added by Abhijit
+        W = get_W(y)
 
         kwargs = {}
 
@@ -468,13 +473,13 @@ class Trainer:
         if self.plot_convergence_metrics and not train:
             with torch.no_grad():
                 x_net, self.conv_metrics = self.model(
-                    y, physics, x_gt=x, compute_metrics=True, **kwargs
+                    y, physics, W, x_gt=x, compute_metrics=True, **kwargs
                 )
             x_net, self.conv_metrics = self.model(
-                y, physics, x_gt=x, compute_metrics=True, **kwargs
+                y, physics, W, x_gt=x, compute_metrics=True, **kwargs
             )
         else:
-            x_net = self.model(y, physics, **kwargs)
+            x_net = self.model(y, physics, W, **kwargs)
 
         return x_net
 
