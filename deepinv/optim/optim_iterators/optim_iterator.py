@@ -62,7 +62,7 @@ class OptimIterator(nn.Module):
         """
         return beta * u + (1 - beta) * v
 
-    def forward(self, X, cur_data_fidelity, cur_prior, cur_params, y, physics):
+    def forward(self, X, cur_data_fidelity, cur_prior, cur_params, L, y, physics, W):
         r"""
         General form of a single iteration of splitting algorithms for minimizing :math:`F =  f + \lambda g`, alternating
         between a step on :math:`f` and a step on :math:`g`.
@@ -73,20 +73,22 @@ class OptimIterator(nn.Module):
         :param deepinv.optim.DataFidelity cur_data_fidelity: Instance of the DataFidelity class defining the current data_fidelity.
         :param deepinv.optim.prior cur_prior: Instance of the Prior class defining the current prior.
         :param dict cur_params: Dictionary containing the current parameters of the algorithm.
+        :param torch.Tensor L: Largest value of the Hessian matrix
         :param torch.Tensor y: Input data.
         :param deepinv.physics physics: Instance of the physics modeling the observation.
+        :param torch.Tensor W: Weight matrix associated with "y".
         :return: Dictionary `{"est": (x, z), "cost": F}` containing the updated current iterate and the estimated current cost.
         """
         x_prev = X["est"][0]
         if not self.g_first:
-            z = self.f_step(x_prev, cur_data_fidelity, cur_params, y, physics)
-            x = self.g_step(z, cur_prior, cur_params)
+            z = self.f_step(x_prev, cur_data_fidelity, cur_params, y, physics, W, L)
+            x = self.g_step(z, cur_prior, cur_params, L)
         else:
             z = self.g_step(x_prev, cur_prior, cur_params)
             x = self.f_step(z, cur_data_fidelity, cur_params, y, physics)
         x = self.relaxation_step(x, x_prev, cur_params["beta"])
         F = (
-            self.F_fn(x, cur_data_fidelity, cur_prior, cur_params, y, physics)
+            self.F_fn(x, cur_data_fidelity, cur_prior, cur_params, y, physics, W)
             if self.has_cost
             else None
         )
