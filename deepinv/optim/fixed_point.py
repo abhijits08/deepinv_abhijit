@@ -251,6 +251,7 @@ class FixedPoint(nn.Module):
                 X,
                 it,
                 L,
+                new_lambda,
                 *args,
                 **kwargs,
             )
@@ -282,7 +283,7 @@ class FixedPoint(nn.Module):
         # Modified by Abhijit to add L
         cur_params["lambda"] = new_lambda
         X = self.iterator(
-            X_prev, cur_data_fidelity, cur_prior, cur_params, *args, **kwargs
+            X_prev, cur_data_fidelity, cur_prior, cur_params, L, *args, **kwargs
         )
         if self.anderson_acceleration:
             X = self.anderson_acceleration_step(
