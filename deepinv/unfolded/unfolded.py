@@ -89,19 +89,51 @@ class BaseUnfold(BaseOptim):
             nn.ModuleList(self.data_fidelity) if self.data_fidelity else None
         )
 
-    def forward(self, y, physics, x_gt=None, compute_metrics=False, **kwargs):
+    def forward(self, y, physics, W=None, x_gt=None, compute_metrics=False, **kwargs):
         r"""
         Runs the fixed-point iteration algorithm. This is the same forward as in the parent BaseOptim class, but without the ``torch.no_grad()`` context manager.
 
         :param torch.Tensor y: measurement vector.
-        :param deepinv.physics.Physics physics: physics of the problem for the acquisition of ``y``.
+        :param deepinv.physics physics: physics of the problem for the acquisition of ``y``.
+        :param torch.Tensor W: Weight matrix associated with "y".
         :param torch.Tensor x_gt: (optional) ground truth image, for plotting the PSNR across optim iterations.
         :param bool compute_metrics: whether to compute the metrics or not. Default: ``False``.
-        :return: If ``compute_metrics`` is ``False``,  returns (:class:`torch.Tensor`) the output of the algorithm.
+        :return: If ``compute_metrics`` is ``False``,  returns (torch.Tensor) the output of the algorithm.
                 Else, returns (torch.Tensor, dict) the output of the algorithm and the metrics.
         """
+        # Added by Abhijit
+        # The next three lines are required to compute a new step size for each input.
+        # The variables alpha_1 and alpha_2 are hard-coded. Need to change these names if the user-defined data fidelity function uses different variables.
+        #W_transformed = (self.data_fidelity[0].alpha_1 * W) + self.data_fidelity[0].alpha_2
+        #W_transformed = W
+        #W_transformed = self.data_fidelity[0].transform_W(W)
+        #L = torch.max(torch.square(W_transformed))
+
+        """pre_W = W
+        post_W = self.data_fidelity[0].transform_W(pre_W)
+        pre_W = pre_W.detach().numpy().squeeze().transpose(1,2,0)
+        post_W = post_W.detach().numpy().squeeze().transpose(1,2,0)/2
+
+        plt.figure(figsize=(3,3))
+        plt.imshow(pre_W)
+        plt.title("Input_w")
+        plt.show()
+
+        plt.figure(figsize=(3,3))
+        plt.imshow(post_W)
+        plt.title("Transformed_w")
+        plt.show()"""
+        
+        L=1
+        #print("This is L in BaseOptim.forward(): ", L)
+        # New lambda
+        #new_lambda = self.data_fidelity[0].lambda_from_y(y)
+        #new_lambda=new_lambda.reshape((1))
+        new_lambda = None
+        #print("New lambda is: ", new_lambda)
+
         X, metrics = self.fixed_point(
-            y, physics, x_gt=x_gt, compute_metrics=compute_metrics, **kwargs
+            y, physics, W, L=L, new_lambda=new_lambda, x_gt=x_gt, compute_metrics=compute_metrics, **kwargs
         )
         x = self.get_output(X)
         if compute_metrics:
