@@ -112,7 +112,7 @@ class fStepPGD(fStep):
     def __init__(self, **kwargs):
         super(fStepPGD, self).__init__(**kwargs)
 
-    def forward(self, x, cur_data_fidelity, cur_params, y, physics):
+    def forward(self, x, cur_data_fidelity, cur_params, y, physics, W, L):
         r"""
          Single PGD iteration step on the data-fidelity term :math:`f`.
 
@@ -120,10 +120,18 @@ class fStepPGD(fStep):
          :param deepinv.optim.DataFidelity cur_data_fidelity: Instance of the DataFidelity class defining the current data_fidelity.
         :param dict cur_params: Dictionary containing the current parameters of the algorithm.
          :param torch.Tensor y: Input data.
-         :param deepinv.physics.Physics physics: Instance of the physics modeling the data-fidelity term.
+         :param deepinv.physics physics: Instance of the physics modeling the data-fidelity term.
+         :param torch.Tensor W: Weight matrix associated with "y".
+         :param torch.Tensor L: Largest value of the Hessian matrix.
         """
+        # Added by Abhijit
+        #step_size = 1/L
+        #step_size = cur_params["stepsize"]
+        #step_size = step_size if step_size > 1/L else 1/L
+        #print("Step size: ", step_size)
+        #cur_params["stepsize"] = step_size
         if not self.g_first:
-            grad = cur_params["stepsize"] * cur_data_fidelity.grad(x, y, physics)
+            grad = cur_params["stepsize"] * cur_data_fidelity.grad(x, y, physics, W)
             return x - grad
         else:
             return cur_data_fidelity.prox(x, y, physics, gamma=cur_params["stepsize"])
@@ -137,20 +145,27 @@ class gStepPGD(gStep):
     def __init__(self, **kwargs):
         super(gStepPGD, self).__init__(**kwargs)
 
-    def forward(self, x, cur_prior, cur_params):
+    def forward(self, x, cur_prior, cur_params, L):
         r"""
-        Single iteration step on the prior term :math:`\lambda \regname`.
+        Single iteration step on the prior term :math:`\lambda g`.
 
         :param torch.Tensor x: Current iterate :math:`x_k`.
         :param dict cur_prior: Dictionary containing the current prior.
         :param dict cur_params: Dictionary containing the current parameters of the algorithm.
+        :param torch.Tensor L: Largest value of the Hessian matrix.
         """
+        # Added by Abhijit
+        #step_size = 1/L
+        #step_size = cur_params["stepsize"]
+        #step_size = step_size if step_size > 1/L else 1/L
+        #print("Step size: ", step_size)
+        #cur_params["stepsize"] = step_size
         if not self.g_first:
             return cur_prior.prox(
                 x,
                 cur_params["g_param"],
-                gamma=cur_params["lambda"] * cur_params["stepsize"],
-            )
+                # Modified to guarantee a positive lambda.
+                gamma=cur_params["lambda"] * cur_params["lambda"] * cur_params["stepsize"],            )
         else:
             grad = (
                 cur_params["lambda"]
