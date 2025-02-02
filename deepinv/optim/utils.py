@@ -6,6 +6,37 @@ from typing import Callable
 from deepinv.utils.tensorlist import TensorList
 
 
+# Added by Abhijit
+def get_W(y):
+
+    r"""
+    A function to compute the pre-conditioning/weight matrix to be used for weighted L2 data fidelity term.
+    :param torch tensor: The observed output whose corresponding weight matrix is required.
+    :return: Square-root of the Hessian matrix of "y", which is the required weight matrix in this case.
+    """
+
+    # Choosing the smallest non-zero value in "y" as the epsilon value.
+    # Not required for non-Poisson noise.
+    #eps = torch.unique(y)[0] if torch.unique(y)[0] != 0 else torch.unique(y)[1]
+
+    #print("shape of y is: ", y.shape)
+    #print("eps is: ", eps)
+
+    #y_mask = y.clone().detach()
+    #y_mask[y_mask==0] = eps
+    #W = torch.sqrt(1/(y_mask))
+
+    signs = y.clone().detach()
+    signs[signs>0] = 1
+    signs[signs<0] = -1
+    #print(torch.unique(signs))
+
+    W = torch.sqrt(torch.abs(y)) * signs
+    #W = W/torch.max(W)
+
+    return W
+
+
 def check_conv(X_prev, X, it, crit_conv="residual", thres_conv=1e-3, verbose=False):
     if crit_conv == "residual":
         if isinstance(X_prev, dict):
