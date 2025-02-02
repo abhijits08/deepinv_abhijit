@@ -299,7 +299,7 @@ class BaseOptim(Reconstructor):
         )
         return cur_data_fidelity
 
-    def init_iterate_fn(self, y, physics, F_fn=None):
+    def init_iterate_fn(self, y, physics, W=None, F_fn=None):
         r"""
         Initializes the iterate of the algorithm.
         The first iterate is stored in a dictionary of the form ``X = {'est': (x_0, u_0), 'cost': F_0}`` where:
@@ -312,6 +312,7 @@ class BaseOptim(Reconstructor):
 
         :param torch.Tensor y: measurement vector.
         :param deepinv.physics: physics of the problem.
+        :param torch.Tensor W: Weight matrix associated with "y".
         :param F_fn: function that computes the cost function.
         :return: a dictionary containing the first iterate of the algorithm.
         """
@@ -331,6 +332,7 @@ class BaseOptim(Reconstructor):
                 self.update_params_fn(0),
                 y,
                 physics,
+                W,
             )
             if self.has_cost and F_fn is not None
             else None
@@ -521,19 +523,19 @@ def create_iterator(
     )
     if F_fn is None and explicit_prior:
 
-        def F_fn(x, data_fidelity, prior, cur_params, y, physics):
+        # Modified to address negative lambda problem.
+        def F_fn(x, data_fidelity, prior, cur_params, y, physics, W=None):
             prior_value = prior(x, cur_params["g_param"], reduce=False)
             if prior_value.dim() == 0:
-                reg_value = cur_params["lambda"] * prior_value
+                reg_value = cur_params["lambda"] * cur_params["lambda"] * prior_value
             else:
                 if isinstance(cur_params["lambda"], float):
-                    reg_value = (cur_params["lambda"] * prior_value).sum()
+                    reg_value = (cur_params["lambda"] * cur_params["lambda"] * prior_value).sum()
                 else:
                     reg_value = (
-                        cur_params["lambda"].flatten().to(prior_value.device)
-                        * prior_value.flatten()
+                        cur_params["lambda"].flatten() * cur_params["lambda"].flatten() * prior_value.flatten()
                     ).sum()
-            return data_fidelity(x, y, physics) + reg_value
+            return data_fidelity(x, y, physics, W) + reg_value
 
         has_cost = True  # boolean to indicate if there is a cost function to evaluate along the iterations
     else:
