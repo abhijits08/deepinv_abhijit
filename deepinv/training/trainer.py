@@ -15,6 +15,11 @@ from deepinv.physics.generator import PhysicsGenerator
 from deepinv.utils.plotting import prepare_images
 from torchvision.utils import save_image
 import inspect
+# Added by Abhijit
+from deepinv.optim.utils import get_W
+from prettytable import PrettyTable
+from skimage.metrics import structural_similarity
+import matplotlib.pyplot as plt
 
 
 @dataclass
@@ -167,6 +172,11 @@ class Trainer:
 
         :param bool train: whether model is being trained.
         """
+
+        # Added by Abhijit
+        self.initial_psnr = []
+        self.final_psnr = []
+        self.final_ssim = []
 
         if type(self.train_dataloader) is not list:
             self.train_dataloader = [self.train_dataloader]
@@ -452,6 +462,9 @@ class Trainer:
         """
         y = y.to(self.device)
 
+        # Added by Abhijit
+        W = get_W(y)
+
         kwargs = {}
 
         # check if the forward has 'update_parameters' method, and if so, update the parameters
@@ -461,13 +474,13 @@ class Trainer:
         if self.plot_convergence_metrics and not train:
             with torch.no_grad():
                 x_net, self.conv_metrics = self.model(
-                    y, physics, x_gt=x, compute_metrics=True, **kwargs
+                    y, physics, W, x_gt=x, compute_metrics=True, **kwargs
                 )
             x_net, self.conv_metrics = self.model(
-                y, physics, x_gt=x, compute_metrics=True, **kwargs
+                y, physics, W, x_gt=x, compute_metrics=True, **kwargs
             )
         else:
-            x_net = self.model(y, physics, **kwargs)
+            x_net = self.model(y, physics, W, **kwargs)
 
         return x_net
 
@@ -551,8 +564,11 @@ class Trainer:
         with torch.no_grad():
             for k, l in enumerate(self.metrics):
                 metric = l(
-                    x_net=x_net,
                     x=x,
+                    x_net=x_net,
+                    y=y,
+                    physics=physics,
+                    model=self.model,
                     epoch=epoch,
                 )
 
@@ -562,11 +578,21 @@ class Trainer:
                 current_log.update(metric.detach().cpu().numpy())
                 logs[l.__class__.__name__] = current_log.avg
 
+                # Added by Abhijit
+                if not train:
+                    # Temp code
+                    self.final_psnr.append(metric.detach().cpu().numpy())
+                    self.final_ssim.append(structural_similarity(x.detach().cpu().numpy().squeeze(), x_net.detach().cpu().numpy().squeeze(), data_range=1.0, channel_axis=0))
+
                 if not train and self.compare_no_learning:
                     x_lin = self.no_learning_inference(y, physics)
-                    metric = l(x=x, x_net=x_lin, y=y, physics=physics, model=self.model)
+                    #metric = l(x=x, x_net=x_lin, y=y, physics=physics, model=self.model)
+                    # To compute PSNR of degraded image
+                    metric = l(x=x, x_net=y, y=y, physics=physics, model=self.model)
                     self.logs_metrics_linear[k].update(metric.detach().cpu().numpy())
-                    logs[f"{l.__class__.__name__} no learning"] = (
+                    # Temp code
+                    self.initial_psnr.append(metric.detach().cpu().numpy())
+                    logs[f"{l.__class__.__name__} degraded image"] = (
                         self.logs_metrics_linear[k].avg
                     )
         return logs
@@ -683,6 +709,18 @@ class Trainer:
                 x_net,
                 train=train,
             )
+
+        # Added by Abhijit
+        """if not train:
+            self.log_metrics_wandb(logs, epoch, train)  # Log metrics to wandb
+            self.plot(
+                epoch,
+                physics_cur,
+                x,
+                y,
+                x_net,
+                train=train,
+            )  # plot images"""
 
     def plot(self, epoch, physics, x, y, x_net, train=True):
         r"""
@@ -969,6 +1007,14 @@ class Trainer:
             out[name + "_std"] = l.std
             if self.verbose:
                 print(f"{name}: {l.avg:.3f} +- {l.std:.3f}")
+
+            # Added by Abhijit
+            t = PrettyTable(['Image number', 'Degraded PSNR', 'Final PSNR', 'Change', 'SSIM'])
+            for i in range(len(self.final_psnr)):
+                #t.add_row([i+1, initial_psnr[i], final_psnr[i], final_psnr[i] - initial_psnr[i]])
+                t.add_row([i, self.initial_psnr[i], self.final_psnr[i], self.final_psnr[i] - self.initial_psnr[i], self.final_ssim[i]])
+            print(t)
+            #print("SSIM rounded to three decimals: ", np.round(np.array(self.final_ssim), 3))
 
         return out
 
