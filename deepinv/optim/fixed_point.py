@@ -204,6 +204,7 @@ class FixedPoint(nn.Module):
         return {"est": est, "cost": F}
 
     def forward(self, *args, compute_metrics=False, x_gt=None, **kwargs):
+        def forward(self, *args, L=None, new_lambda=None, compute_metrics=False, x_gt=None, **kwargs):
         r"""
         Loops over the fixed-point iterator as (1) and returns the fixed point.
 
@@ -215,6 +216,8 @@ class FixedPoint(nn.Module):
         Since the prior and parameters (stepsize, regularisation parameter, etc.) can change at each iteration,
         the prior and parameters are updated before each call to the iterator.
 
+        :param torch.Tensor L: Largest value of the Hessian matrix
+        :param torch.Tensor new_lambda: Lambda value to be used for that specific input
         :param bool compute_metrics: if ``True``, the metrics are computed along the iterations. Default: ``False``.
         :param torch.Tensor x_gt: ground truth solution. Default: ``None``.
         :param args: optional arguments for the iterator. Commonly (y,physics) where ``y`` (torch.Tensor y) is the measurement and
@@ -249,7 +252,12 @@ class FixedPoint(nn.Module):
             X = self.single_iteration(
                 X,
                 it,
+                L,
+                new_lambda,
                 *args,
+                compute_metrics=compute_metrics,
+                metrics=metrics,
+                x_gt=x_gt,
                 **kwargs,
             )
 
@@ -270,15 +278,18 @@ class FixedPoint(nn.Module):
 
         return X, metrics
 
-    def single_iteration(self, X, it, *args, **kwargs):
+    def single_iteration(self, X, it, L, new_lambda, *args, **kwargs):
         cur_params = self.update_params_fn(it) if self.update_params_fn else None
         cur_data_fidelity = (
             self.update_data_fidelity_fn(it) if self.update_data_fidelity_fn else None
         )
         cur_prior = self.update_prior_fn(it) if self.update_prior_fn else None
         X_prev = X
+        # Modified by Abhijit to add L
+        #cur_params["lambda"] = new_lambda
+        #print("New lambda is (2): ", new_lambda)
         X = self.iterator(
-            X_prev, cur_data_fidelity, cur_prior, cur_params, *args, **kwargs
+            X_prev, cur_data_fidelity, cur_prior, cur_params, L, *args, **kwargs
         )
         if self.anderson_acceleration:
             X = self.anderson_acceleration_step(
