@@ -24,18 +24,20 @@ class DataFidelity(Potential):
         super().__init__()
         self.d = Distance(d=d)
 
-    def fn(self, x, y, physics, *args, **kwargs):
+    def fn(self, x, y, physics, W=None, *args, **kwargs):
         r"""
         Computes the data fidelity term :math:`\datafid{x}{y} = \distance{\forw{x}}{y}`.
 
         :param torch.Tensor x: Variable :math:`x` at which the data fidelity is computed.
         :param torch.Tensor y: Data :math:`y`.
         :param deepinv.physics.Physics physics: physics model.
+        :param torch.Tensor W: Weight matrix associated with "y".
         :return: (:class:`torch.Tensor`) data fidelity :math:`\datafid{x}{y}`.
         """
-        return self.d(physics.A(x), y, *args, **kwargs)
+        # Modified by Abhijit
+        return self.d(physics.A(x), y, W, *args, **kwargs)
 
-    def grad(self, x, y, physics, *args, **kwargs):
+    def grad(self, x, y, physics, W=None, *args, **kwargs):
         r"""
         Calculates the gradient of the data fidelity term :math:`\datafidname` at :math:`x`.
 
@@ -50,9 +52,11 @@ class DataFidelity(Potential):
         :param torch.Tensor x: Variable :math:`x` at which the gradient is computed.
         :param torch.Tensor y: Data :math:`y`.
         :param deepinv.physics.Physics physics: physics model.
+        :param torch.Tensor W: Weight matrix associated with "y".
         :return: (:class:`torch.Tensor`) gradient :math:`\nabla_x \datafid{x}{y}`, computed in :math:`x`.
         """
-        return physics.A_vjp(x, self.d.grad(physics.A(x), y, *args, **kwargs))
+        # Modified by Abhijit
+        return physics.A_vjp(x, self.d.grad(physics.A(x), y, W, *args, **kwargs))
 
     def grad_d(self, u, y, *args, **kwargs):
         r"""
