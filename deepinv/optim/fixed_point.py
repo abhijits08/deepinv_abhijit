@@ -203,8 +203,7 @@ class FixedPoint(nn.Module):
         est[0] = x
         return {"est": est, "cost": F}
 
-    def forward(self, *args, compute_metrics=False, x_gt=None, **kwargs):
-        def forward(self, *args, L=None, new_lambda=None, compute_metrics=False, x_gt=None, **kwargs):
+    def forward(self, *args, L=None, new_lambda=None, compute_metrics=False, x_gt=None, **kwargs):
         r"""
         Loops over the fixed-point iterator as (1) and returns the fixed point.
 
