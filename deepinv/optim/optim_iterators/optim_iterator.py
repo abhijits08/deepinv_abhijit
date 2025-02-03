@@ -91,7 +91,7 @@ class OptimIterator(nn.Module):
             x = self.f_step(
                 z, cur_data_fidelity, cur_params, y, physics, *args, **kwargs
             )
-        x = self.relaxation_step(x, x_prev, cur_params["beta"], *args, **kwargs)
+        x = self.relaxation_step(x, x_prev, cur_params["beta"])#, *args, **kwargs)
         F = (
             self.F_fn(x, cur_data_fidelity, cur_prior, cur_params, y, physics, W)
             if self.has_cost
